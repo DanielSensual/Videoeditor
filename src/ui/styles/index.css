@@ -1,0 +1,227 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+:root {
+  --bg: #f3efe6;
+  --bg-accent: #efe2cf;
+  --surface: #fff7ea;
+  --surface-strong: #fff0dc;
+  --ink: #1e2629;
+  --text-muted: #5c6a70;
+  --text-secondary: #465157;
+  --border: #e4d6bf;
+  --accent: #1f9fa8;
+  --accent-strong: #17838b;
+  --accent-2: #f07f48;
+  --accent-2-strong: #d86a3b;
+  --warning: #e85d3b;
+  --success: #2a9d8f;
+  --shadow: 0 18px 50px rgba(35, 32, 28, 0.12);
+  --shadow-soft: 0 8px 30px rgba(35, 32, 28, 0.08);
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: radial-gradient(circle at top, rgba(31, 159, 168, 0.12), transparent 55%),
+              radial-gradient(circle at 80% 20%, rgba(240, 127, 72, 0.14), transparent 45%),
+              linear-gradient(180deg, var(--bg) 0%, #f8f5ee 100%);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(transparent 97%, rgba(30, 38, 41, 0.04) 100%),
+                    linear-gradient(90deg, transparent 97%, rgba(30, 38, 41, 0.04) 100%);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-10);
+}
+
+.app-main {
+  animation: fadeUp 0.6s ease-out both;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mt-6 {
+  margin-top: var(--space-6);
+}
+
+.p-4 {
+  padding: var(--space-4);
+}
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-primary {
+  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: var(--surface-strong);
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 1rem;
+}
+
+.toast-container {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  display: grid;
+  gap: 12px;
+  z-index: 10;
+}
+
+.toast {
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  min-width: 240px;
+}
+
+.toast.success {
+  border-left: 4px solid var(--success);
+}
+
+.toast.error {
+  border-left: 4px solid var(--warning);
+}
+
+.toast-icon {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.toast-message {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.toast-close {
+  border: none;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.animate-pulse {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-container {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+
+  .toast-container {
+    right: 16px;
+    left: 16px;
+    top: 16px;
+  }
+}
