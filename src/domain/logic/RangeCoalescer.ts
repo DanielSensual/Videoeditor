@@ -35,12 +35,12 @@ export interface CoalescerConfig {
 }
 
 /**
- * Default coalescer configuration
+ * Default coalescer configuration - lenient to keep more content
  */
 export const DEFAULT_COALESCER_CONFIG: CoalescerConfig = {
   frameWindow: 1.0,
-  mergeGap: 0.5,
-  minSegmentDuration: 1.0
+  mergeGap: 1.0,           // Increased from 0.5 - merge nearby segments
+  minSegmentDuration: 0.5  // Lowered from 1.0 - allow shorter clips
 };
 
 /**
@@ -68,7 +68,15 @@ export function coalesceToRanges(
   // Filter to only kept/highlighted decisions
   const keepDecisions = sorted.filter(d => d.decision !== 'discard');
 
-  if (keepDecisions.length === 0) return [];
+  // FALLBACK: If nothing to keep, create a range from the first 10 seconds
+  if (keepDecisions.length === 0) {
+    const maxTime = sorted.length > 0 ? sorted[sorted.length - 1].timestamp : 10;
+    const fallbackEnd = Math.min(10, maxTime + config.frameWindow);
+    console.warn('[RangeCoalescer] No frames passed filter, using fallback range 0-' + fallbackEnd);
+    return [
+      createTimeRange(0, fallbackEnd, 1, 'Fallback: no frames passed quality filter')
+    ];
+  }
 
   // Convert each decision to a range
   const initialRanges: TimeRange[] = keepDecisions.map(d =>
@@ -84,9 +92,15 @@ export function coalesceToRanges(
   const merged = mergeAdjacentRanges(initialRanges, config.mergeGap);
 
   // Filter out segments that are too short
-  const filtered = merged.filter(r =>
+  let filtered = merged.filter(r =>
     (r.end - r.start) >= config.minSegmentDuration
   );
+
+  // FALLBACK: If all merged ranges are too short, just return the merged ranges anyway
+  if (filtered.length === 0 && merged.length > 0) {
+    console.warn('[RangeCoalescer] All segments too short, keeping them anyway');
+    filtered = merged;
+  }
 
   return filtered;
 }
