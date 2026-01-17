@@ -169,12 +169,16 @@ export async function composeVideo(
       message: `Extracting segment ${i + 1}/${sortedRanges.length}`
     });
 
-    // Extract segment
+    // Extract segment - re-encode to ensure proper keyframes
     await ffmpeg.exec([
+      '-ss', range.start.toString(),  // Seek BEFORE input for faster seeking
       '-i', 'input.mp4',
-      '-ss', range.start.toString(),
       '-t', (range.end - range.start).toString(),
-      '-c', 'copy',
+      '-c:v', 'libx264',              // Re-encode video (not copy)
+      '-c:a', 'aac',                   // Re-encode audio
+      '-crf', '23',                    // Good quality
+      '-preset', 'ultrafast',          // Fast encoding
+      '-y',                            // Overwrite
       segmentName
     ]);
 
