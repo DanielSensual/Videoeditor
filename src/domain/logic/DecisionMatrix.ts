@@ -28,11 +28,12 @@ export interface DecisionConfig {
 }
 
 /**
- * Default configuration optimized for real estate content
+ * Default configuration - lenient to keep more content
+ * Adjust these values to be more/less selective
  */
 export const DEFAULT_CONFIG: DecisionConfig = {
-  aestheticThreshold: 0.6,
-  confidenceThreshold: 0.5,
+  aestheticThreshold: 0.3,   // Lowered from 0.6 - keep more frames
+  confidenceThreshold: 0.3,  // Lowered from 0.5 - trust more classifications
   realEstateMode: true
 };
 
