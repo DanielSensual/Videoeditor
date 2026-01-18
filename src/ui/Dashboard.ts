@@ -26,6 +26,10 @@ export class Dashboard {
   private state: AppState = 'idle';
   private currentFile: File | null = null;
   private result: PipelineResult | null = null;
+  private currentFileUrl: string | null = null;
+  private previewMode: 'edited' | 'full' = 'edited';
+  private playbackRanges: TimeRange[] = [];
+  private playbackIndex = 0;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -51,6 +55,30 @@ export class Dashboard {
       case 'exporting':
         this.renderExportingView();
         break;
+    }
+  }
+
+  private setCurrentFile(file: File): void {
+    this.releaseCurrentFileUrl();
+    this.currentFile = file;
+    this.result = null;
+    this.previewMode = 'edited';
+    this.playbackRanges = [];
+    this.playbackIndex = 0;
+  }
+
+  private getCurrentFileUrl(): string | null {
+    if (!this.currentFile) return null;
+    if (!this.currentFileUrl) {
+      this.currentFileUrl = URL.createObjectURL(this.currentFile);
+    }
+    return this.currentFileUrl;
+  }
+
+  private releaseCurrentFileUrl(): void {
+    if (this.currentFileUrl) {
+      URL.revokeObjectURL(this.currentFileUrl);
+      this.currentFileUrl = null;
     }
   }
 
@@ -129,7 +157,7 @@ export class Dashboard {
    * Handle file upload and start processing
    */
   private async handleFileUpload(file: File): Promise<void> {
-    this.currentFile = file;
+    this.setCurrentFile(file);
     this.state = 'processing';
     this.render();
 
@@ -215,9 +243,10 @@ export class Dashboard {
     `;
 
     // Load video preview
-    if (this.currentFile) {
+    const fileUrl = this.getCurrentFileUrl();
+    if (fileUrl) {
       const video = document.getElementById('previewVideo') as HTMLVideoElement;
-      video.src = URL.createObjectURL(this.currentFile);
+      video.src = fileUrl;
     }
   }
 
@@ -262,6 +291,10 @@ export class Dashboard {
     if (!this.result) return;
 
     const { stats, frames, decisions, ranges } = this.result;
+    const keptFrames = decisions.filter((d) => d.decision !== 'discard').length;
+    const keepRate = decisions.length > 0
+      ? Math.round((keptFrames / decisions.length) * 100)
+      : 0;
 
     this.container.innerHTML = `
       <div class="app-container">
@@ -272,6 +305,17 @@ export class Dashboard {
               <div class="results-preview">
                 <div class="results-video">
                   <video id="resultVideo" controls></video>
+                </div>
+                <div class="results-preview-toolbar">
+                  <div class="preview-toggle" role="group" aria-label="Playback mode">
+                    <button class="chip ${this.previewMode === 'edited' ? 'active' : ''}" id="btnPreviewEdited" type="button">
+                      Edited Preview
+                    </button>
+                    <button class="chip ${this.previewMode === 'full' ? 'active' : ''}" id="btnPreviewFull" type="button">
+                      Full Video
+                    </button>
+                  </div>
+                  <div class="preview-hint">Edited preview skips discarded ranges. Export renders a real file.</div>
                 </div>
               </div>
 
@@ -330,8 +374,16 @@ export class Dashboard {
                     <div class="results-stat-label">Frames Analyzed</div>
                   </div>
                   <div class="results-stat">
-                    <div class="results-stat-value warning">${stats.compressionRatio.toFixed(1)}x</div>
+                    <div class="results-stat-value warning">${this.formatCompressionRatio(stats.compressionRatio)}</div>
                     <div class="results-stat-label">Compression</div>
+                  </div>
+                  <div class="results-stat">
+                    <div class="results-stat-value accent">${ranges.length}</div>
+                    <div class="results-stat-label">Segments</div>
+                  </div>
+                  <div class="results-stat">
+                    <div class="results-stat-value">${keepRate}%</div>
+                    <div class="results-stat-label">Keep Rate</div>
                   </div>
                 </div>
               </div>
@@ -349,14 +401,22 @@ export class Dashboard {
     `;
 
     // Load video
-    if (this.currentFile) {
-      const video = document.getElementById('resultVideo') as HTMLVideoElement;
-      video.src = URL.createObjectURL(this.currentFile);
+    const video = document.getElementById('resultVideo') as HTMLVideoElement | null;
+    if (video) {
+      const fileUrl = this.getCurrentFileUrl();
+      if (fileUrl) video.src = fileUrl;
+      this.setupResultsPlayback(video, ranges);
+      this.setupPreviewModeControls(video);
+      this.setupTimelineInteractions(video);
+      this.setupSegmentInteractions(video);
     }
+
+    this.paintThumbnails(frames);
 
     // Setup event handlers
     document.getElementById('btnStartOver')?.addEventListener('click', () => {
       this.state = 'idle';
+      this.releaseCurrentFileUrl();
       this.currentFile = null;
       this.result = null;
       this.render();
@@ -375,6 +435,7 @@ export class Dashboard {
       const left = (d.timestamp / duration) * 100;
       const width = (1 / duration) * 100;
       return `<div class="timeline-segment ${d.decision}"
+        data-timestamp="${d.timestamp}"
         style="left: ${left}%; width: ${Math.max(width, 1)}%;"
         title="${d.reason}"></div>`;
     }).join('');
@@ -394,6 +455,7 @@ export class Dashboard {
       const className = decision?.decision || 'keep';
 
       return `<div class="timeline-thumbnail ${className}"
+        data-frame-index="${frame.frameIndex}"
         data-timestamp="${frame.timestamp}"
         title="${this.formatTime(frame.timestamp)} - ${decision?.reason || 'Unknown'}">
         <canvas id="thumb_${i}" width="80" height="45"></canvas>
@@ -409,8 +471,8 @@ export class Dashboard {
       return '<p class="text-muted text-center p-4">No segments to keep</p>';
     }
 
-    return ranges.map((range) => `
-      <div class="frame-analysis-card" style="margin-bottom: var(--space-2);">
+    return ranges.map((range, index) => `
+      <button class="frame-analysis-card segment-card" data-range-index="${index}" data-range-start="${range.start}" type="button">
         <div class="frame-analysis-header">
           <div class="frame-analysis-time">
             ${this.formatTime(range.start)} -> ${this.formatTime(range.end)}
@@ -422,7 +484,7 @@ export class Dashboard {
         <div style="font-size: 0.75rem; color: var(--text-muted);">
           ${range.label || 'High quality segment'}
         </div>
-      </div>
+      </button>
     `).join('');
   }
 
@@ -520,6 +582,190 @@ export class Dashboard {
     `;
   }
 
+  private setupPreviewModeControls(video: HTMLVideoElement): void {
+    const editedButton = document.getElementById('btnPreviewEdited');
+    const fullButton = document.getElementById('btnPreviewFull');
+
+    editedButton?.addEventListener('click', () => {
+      this.setPreviewMode('edited', video);
+    });
+
+    fullButton?.addEventListener('click', () => {
+      this.setPreviewMode('full', video);
+    });
+  }
+
+  private setPreviewMode(mode: 'edited' | 'full', video?: HTMLVideoElement): void {
+    this.previewMode = mode;
+    const editedButton = document.getElementById('btnPreviewEdited');
+    const fullButton = document.getElementById('btnPreviewFull');
+
+    editedButton?.classList.toggle('active', mode === 'edited');
+    fullButton?.classList.toggle('active', mode === 'full');
+
+    if (mode === 'edited' && video) {
+      this.snapToRange(video, video.currentTime, false);
+    }
+  }
+
+  private setupResultsPlayback(video: HTMLVideoElement, ranges: TimeRange[]): void {
+    this.playbackRanges = ranges;
+    this.playbackIndex = 0;
+
+    video.addEventListener('loadedmetadata', () => {
+      if (this.previewMode === 'edited') {
+        this.snapToRange(video, video.currentTime, false);
+      }
+    });
+
+    video.addEventListener('play', () => {
+      if (this.previewMode === 'edited') {
+        this.snapToRange(video, video.currentTime, true);
+      }
+    });
+
+    video.addEventListener('timeupdate', () => {
+      if (this.previewMode === 'edited') {
+        this.enforceEditedPlayback(video);
+      }
+    });
+
+    video.addEventListener('seeking', () => {
+      if (this.previewMode === 'edited') {
+        this.snapToRange(video, video.currentTime, false);
+      }
+    });
+  }
+
+  private enforceEditedPlayback(video: HTMLVideoElement): void {
+    if (this.playbackRanges.length === 0) return;
+
+    const currentRange = this.playbackRanges[this.playbackIndex];
+    if (!currentRange) return;
+
+    if (video.currentTime < currentRange.start) {
+      video.currentTime = currentRange.start;
+      return;
+    }
+
+    const endEpsilon = 0.05;
+    if (video.currentTime >= currentRange.end - endEpsilon) {
+      const nextRange = this.playbackRanges[this.playbackIndex + 1];
+      if (nextRange) {
+        this.playbackIndex += 1;
+        video.currentTime = nextRange.start;
+        if (!video.paused) {
+          void video.play();
+        }
+      } else {
+        video.pause();
+        video.currentTime = currentRange.end;
+      }
+    }
+  }
+
+  private snapToRange(video: HTMLVideoElement, time: number, resume: boolean): void {
+    const index = this.findRangeIndexForTime(time);
+    if (index === -1) return;
+
+    this.playbackIndex = index;
+    const range = this.playbackRanges[index];
+    const clampedTime = time < range.start || time >= range.end
+      ? range.start
+      : time;
+
+    if (video.currentTime !== clampedTime) {
+      video.currentTime = clampedTime;
+    }
+
+    if (resume && video.paused) {
+      void video.play();
+    }
+  }
+
+  private findRangeIndexForTime(time: number): number {
+    if (this.playbackRanges.length === 0) return -1;
+
+    const directIndex = this.playbackRanges.findIndex(
+      (range) => time >= range.start && time < range.end
+    );
+    if (directIndex !== -1) return directIndex;
+
+    const nextIndex = this.playbackRanges.findIndex((range) => time < range.start);
+    return nextIndex !== -1 ? nextIndex : this.playbackRanges.length - 1;
+  }
+
+  private setupTimelineInteractions(video: HTMLVideoElement): void {
+    document.querySelectorAll<HTMLElement>('.timeline-segment').forEach((segment) => {
+      segment.addEventListener('click', () => {
+        const timestamp = Number(segment.dataset.timestamp);
+        if (Number.isNaN(timestamp)) return;
+        this.seekToTime(video, timestamp);
+      });
+    });
+
+    document.querySelectorAll<HTMLElement>('.timeline-thumbnail').forEach((thumb) => {
+      thumb.addEventListener('click', () => {
+        const timestamp = Number(thumb.dataset.timestamp);
+        if (Number.isNaN(timestamp)) return;
+        this.seekToTime(video, timestamp);
+      });
+    });
+  }
+
+  private setupSegmentInteractions(video: HTMLVideoElement): void {
+    document.querySelectorAll<HTMLElement>('.segment-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const start = Number(card.dataset.rangeStart);
+        if (Number.isNaN(start)) return;
+        this.seekToTime(video, start);
+      });
+    });
+  }
+
+  private seekToTime(video: HTMLVideoElement, time: number): void {
+    if (this.previewMode === 'edited') {
+      const index = this.findRangeIndexForTime(time);
+      if (index !== -1) {
+        this.playbackIndex = index;
+        const range = this.playbackRanges[index];
+        const safeTime = Math.min(Math.max(time, range.start), range.end - 0.05);
+        video.currentTime = safeTime;
+      } else {
+        video.currentTime = time;
+      }
+    } else {
+      video.currentTime = time;
+    }
+
+    void video.play();
+  }
+
+  private paintThumbnails(frames: FrameMetadata[]): void {
+    if (frames.length === 0) return;
+    const frameIndexMap = new Map<number, FrameMetadata>();
+    frames.forEach((frame) => {
+      frameIndexMap.set(frame.frameIndex, frame);
+    });
+
+    document.querySelectorAll<HTMLElement>('.timeline-thumbnail').forEach((thumb) => {
+      const frameIndex = Number(thumb.dataset.frameIndex);
+      if (Number.isNaN(frameIndex)) return;
+
+      const frame = frameIndexMap.get(frameIndex);
+      if (!frame || !frame.thumbnail) return;
+
+      const canvas = thumb.querySelector('canvas');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frame.thumbnail, 0, 0, canvas.width, canvas.height);
+    });
+  }
+
   /**
    * Format seconds to MM:SS
    */
@@ -527,6 +773,11 @@ export class Dashboard {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  private formatCompressionRatio(ratio: number): string {
+    if (!Number.isFinite(ratio) || ratio <= 0) return '--';
+    return `${ratio.toFixed(1)}x`;
   }
 
   /**

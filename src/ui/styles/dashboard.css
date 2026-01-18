@@ -310,6 +310,52 @@
   max-height: 400px;
 }
 
+/* Preview Mode Toggle (Codex feature) */
+.results-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.preview-toggle {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+
+.chip {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip:hover {
+  color: var(--ink);
+}
+
+.chip.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.preview-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* ===== TIMELINE ===== */
 .timeline-container {
   margin-top: var(--space-6);
@@ -382,6 +428,13 @@
   top: 2px;
   bottom: 2px;
   border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.timeline-segment:hover {
+  transform: scaleY(1.2);
+  opacity: 1;
 }
 
 .timeline-segment.highlight {
@@ -413,6 +466,12 @@
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.timeline-thumbnail:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 
 .timeline-thumbnail.keep {
@@ -500,17 +559,25 @@
 }
 
 /* ===== SEGMENT LIST ===== */
-.frame-analysis-card {
+.frame-analysis-card,
+.segment-card {
+  appearance: none;
+  width: 100%;
   background: var(--surface-strong);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   padding: var(--space-4);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.frame-analysis-card:hover {
+.frame-analysis-card:hover,
+.segment-card:hover {
   border-color: var(--accent);
   transform: translateX(4px);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .frame-analysis-header {
